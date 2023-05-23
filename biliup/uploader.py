@@ -1,11 +1,11 @@
 import inspect
 import logging
+import time
+
 from biliup.config import config
-from biliup import common
 from .engine.decorators import Plugin
 
 logger = logging.getLogger('biliup')
-
 
 def upload(data):
     """
@@ -18,22 +18,18 @@ def upload(data):
     try:
         index = data['name']
         context = {**config, **config['streamers'][index]}
-        # platform = context.get("uploader") if context.get("uploader") else "bili_web"
-        platform = context.get("uploader") if context.get("uploader") else "biliup-rs"
-        if context.get('user_cookie'):
-            platform = 'biliup-rs'
+        platform = context.get("uploader", "biliup-rs")
         cls = Plugin.upload_plugins.get(platform)
         if cls is None:
             return logger.error(f"No such uploader: {platform}")
-
-        date = data.get("date") if data.get("date") else common.time.now()
-        room_title = data.get('title') if data.get('title') else index
-        if context.get('title'):
-            data["format_title"] = custom_fmtstr(context.get('title'), date, room_title)
-        else:
-            data["format_title"] = f"{common.time.format_time(date)}{index}"
+        streamer = data.get('streamer', index)
+        date = data.get("date", time.localtime())
+        title = data.get('title', index)
+        url = data.get('url')
+        live_cover_path = data.get('live_cover_path')
+        data["format_title"] = custom_fmtstr(context.get('title', f'%Y.%m.%d{index}'), date, title, streamer, url)
         if context.get('description'):
-            context['description'] = custom_fmtstr(context.get('description'), date, room_title)
+            context['description'] = custom_fmtstr(context.get('description'), date, title, streamer, url)
         threshold = config.get('filtering_threshold')
         if threshold:
             data['threshold'] = threshold
@@ -49,5 +45,5 @@ def upload(data):
         logger.exception("Uncaught exception:")
 
 
-def custom_fmtstr(string, time, title):
-    return common.time.format_time(time, string).format(title=title)
+def custom_fmtstr(string, date, title, streamer, url):
+    return time.strftime(string.encode('unicode-escape').decode(), date).encode().decode("unicode-escape").format(title=title, streamer=streamer, url=url)

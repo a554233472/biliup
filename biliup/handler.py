@@ -1,4 +1,6 @@
 import logging
+import subprocess
+from pathlib import Path
 
 from . import plugins
 from .downloader import download, check_url
@@ -6,6 +8,7 @@ from .engine import invert_dict, Plugin
 from biliup.config import config
 from .engine.event import Event, EventManager
 from .uploader import upload
+from functools import reduce
 
 CHECK = 'check'
 CHECK_UPLOAD = 'check_upload'
@@ -42,8 +45,7 @@ def process(name, url):
         'url': url,
     }
     try:
-        kwargs = {'downloader': config.get('downloader') if config.get('downloader') else 'stream-gears'}
-        kwargs.update(config['streamers'][name].copy())
+        kwargs: dict = config['streamers'][name].copy()
         kwargs.pop('url')
         suffix = kwargs.get('format')
         if suffix:
@@ -77,7 +79,7 @@ class KernelFunc:
     def singleton_check(self, platform):
         plugin = self.checker[platform]
         wait = config.get('checker_sleep') if config.get('checker_sleep') else 15
-        for url in check_url(plugin, secs=wait):
+        for url in check_url(plugin, self.url_status, secs=wait):
             yield Event(TO_MODIFY, args=(url,))
 
     @event_manager.register(TO_MODIFY)
@@ -89,6 +91,9 @@ class KernelFunc:
         if self.url_status[url] == 2:
             return logger.debug('正在上传稍后下载')
         name = self.inverted_index[url]
+
+        if config['streamers'].get(name, {}).get('preprocessor'):
+            preprocessor(config['streamers'].get(name, {}).get('preprocessor'))
         logger.debug(f'{name}刚刚开播，去下载')
         self.url_status[url] = 1
         return Event(DOWNLOAD, args=(name, url))
@@ -98,9 +103,9 @@ class KernelFunc:
         for title, urls in self.streamer_url.items():
             if self.free(urls):
                 yield Event(UPLOAD, args=({
-                    'name': title,
-                    'url': urls[0],
-                },))
+                                              'name': title,
+                                              'url': urls[0],
+                                          },))
 
     @event_manager.register(BE_MODIFIED)
     def revise(self, url, status):
@@ -115,3 +120,17 @@ class KernelFunc:
 
     def get_url_status(self):
         return self.url_status
+
+
+def preprocessor(pre_processors):
+    for pre_processor in pre_processors:
+        if pre_processor.get('run'):
+            try:
+                process_output = subprocess.check_output(
+                    pre_processor['run'], shell=True,
+                    input=reduce(lambda x, y: x + str(Path(y).absolute()) + '\n', '', ''),
+                    stderr=subprocess.STDOUT, text=True)
+                logger.info(process_output.rstrip())
+            except subprocess.CalledProcessError as e:
+                logger.exception(e.output)
+                continue

@@ -7,7 +7,7 @@
 [discord-badge]: https://img.shields.io/discord/1015494098481852447.svg?logo=discord
 [discord-url]: https://discord.gg/shZmdxDFB7
 
-* 支持自动录制各大直播平台实时流，上传到bilibili
+* 支持自动录制各大主流直播平台实时直播流，包括但不限于acfun，afreecaTV，哔哩哔哩，斗鱼，抖音，虎牙，网易CC，猫耳FM，Twitch，YY直播等，并于录制结束后上传到哔哩哔哩视频网站。
 * 支持YouTube，twitch直播回放列表自动搬运至b站，如链接https://www.twitch.tv/xxxx/videos?filter=archives&sort=time
 * 自动选择上传线路，保证国内外vps上传质量和速度
 * 可分别控制下载与上传并发量
@@ -21,6 +21,8 @@
 > * [Ubuntu](https://blog.waitsaber.org/archives/129) 、[CentOS](https://blog.waitsaber.org/archives/163)
 、[Windows](https://blog.waitsaber.org/archives/169) 教程
 与 [常见问题](https://blog.waitsaber.org/archives/167) 解决方案 by [@waitsaber](https://github.com/waitsaber)
+
+**更新日志**：[CHANGELOG.md](CHANGELOG.md)
 
 **文档地址**：<https://biliup.github.io/biliup>
 ## INSTALLATION
@@ -59,6 +61,9 @@ yaml配置文件完整内容可参照 [config.yaml](https://github.com/ForgQi/bi
 __FFmpeg__ 作为可选依赖。如果还有问题可以 [加群讨论](https://github.com/ForgQi/biliup/discussions/58#discussioncomment-2388776) 。
 
 > 使用上传功能需要登录B站，通过 [命令行投稿工具](https://github.com/ForgQi/biliup-rs) 获取 cookies.json，并放入启动 biliup 的路径即可
+
+> ARM平台用户，需要使用到stream-gears（默认下载器与上传器）进行下载和上传的，请参考此教程降级stream-gears版本。 https://github.com/biliup/biliup/discussions/407
+
 
 Linux下以daemon进程启动，录像和日志文件保存在执行目录下，程序执行过程可查看日志文件。
 `ps -A | grep biliup` 查看进程是否启动成功。
@@ -145,7 +150,7 @@ with BiliBili(video) as bili:
     for file in file_list:
         video_part = bili.upload_file(file, lines=lines, tasks=tasks)  # 上传视频，默认线路AUTO自动选择，线程数量3。
         video.append(video_part)  # 添加已经上传的视频
-    video.dtime = dtime # 设置延后发布（2小时~15天）
+    video.delay_time(dtime) # 设置延后发布（2小时~15天）
     video.cover = bili.cover_up('/cover_path').replace('http:', '')
     ret = bili.submit()  # 提交视频
 ```
@@ -168,9 +173,9 @@ bup模式支持的上传方式为upos，其线路有：
 * bda2（百度）
 
 bupfetch模式支持的上传方式及线路有：
-1. kodo（七牛）
-2. gcs（谷歌）
-3. bos（百度）
+* kodo（七牛）
+* ~~gcs (谷歌）已失效~~
+* ~~bos (百度）已失效~~
 
 国内基本选择upos模式的bda2线路。国外多为upos模式的ws和qn线路，也有bupfetch模式的kodo、gcs线路。bilibili采用客户端和服务器端线路探测相结合的方式，服务器会返回可选线路，客户端上传前会先发包测试选择一条延迟最低的线路，保证各个地区的上传质量。
 ***
@@ -236,16 +241,14 @@ $ systemctl --user start biliupd
 ## Deprecated
 * ~~selenium操作浏览器上传两种方式~~(详见bili_chromeup.py)
 * ~~Windows图形界面版在release中下载AutoTool.msi进行安装~~[AutoTool.msi](https://github.com/ForgQi/bilibiliupload/releases/tag/v0.1.0)
-
 * 相关配置示例在config.yaml文件中，如直播间地址，b站账号密码\
 由于目前使用账号密码登录，大概率触发验证。请使用命令行工具登录，将登录返回的信息填入配置文件，
-且使用引号括起yaml中cookie的数字代表其为字符串, 
+且使用引号括起yaml中cookie的数字代表其为字符串
+
 >关于B站为什么不能多p上传\
 目前bilibili网页端是根据用户权重来限制分p数量的，权重不够的用户切换到客户端的提交接口即可解除这一限制。
 >用户等级大于3，且粉丝数>1000，web端投稿不限制分p数量
+
 ## Credits
 * Thanks `ykdl, youtube-dl, streamlink` provides downloader.
 >GUI：[B站投稿客户端 biliup-app](https://github.com/ForgQi/Caution)
-
-类似项目:\
-![ZhangMingZhao1](https://avatars2.githubusercontent.com/u/29058747?s=50&u=5f8c3acaa9d09f4396f00256c0ce6ef01452e92f&v=4) ：StreamerHelper

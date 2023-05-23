@@ -5,15 +5,17 @@ import json
 import requests
 
 from biliup.config import config
+from biliup.plugins.Danmaku import DanmakuClient
 from ..engine.decorators import Plugin
-from ..plugins import match1, logger
 from ..engine.download import DownloadBase
+from ..plugins import match1, logger
 
 
 @Plugin.download(regexp=r'(?:https?://)?(?:(?:www|m)\.)?huya\.com')
 class Huya(DownloadBase):
     def __init__(self, fname, url, suffix='flv'):
         super().__init__(fname, url, suffix)
+        self.huya_danmaku = config.get('huya_danmaku', False)
 
     def check_stream(self):
         logger.debug(self.fname)
@@ -29,7 +31,7 @@ class Huya(DownloadBase):
             else:
                 huya = None
         if huya:
-            huyacdn = config.get('huyacdn') if config.get('huyacdn') else 'AL'
+            huyacdn = config.get('huyacdn', 'AL')
             huyajson1 = json.loads(huya)['data'][0]['gameStreamInfoList']
             huyajson2 = json.loads(huya)['vMultiStreamInfo']
             ratio = huyajson2[0]['iBitRate']
@@ -47,5 +49,16 @@ class Huya(DownloadBase):
             absurl = f'{huyajson["sFlvUrl"]}/{huyajson["sStreamName"]}.{huyajson["sFlvUrlSuffix"]}?' \
                      f'{huyajson["sFlvAntiCode"]}'
             self.raw_stream_url = html.unescape(absurl) + "&ratio=" + str(ratio)
-            self.room_title = json.loads(huya)['data'][0]['gameLiveInfo']['roomName']
+            self.room_title = json.loads(huya)['data'][0]['gameLiveInfo']['introduction']
             return True
+
+    async def danmaku_download_start(self, filename):
+        if self.huya_danmaku:
+            logger.info("开始弹幕录制")
+            self.danmaku = DanmakuClient(self.url, filename + "." + self.suffix)
+            await self.danmaku.start()
+
+    def close(self):
+        if self.huya_danmaku:
+            self.danmaku.stop()
+            logger.info("结束弹幕录制")

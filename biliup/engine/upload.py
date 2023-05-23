@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 import shutil
 import subprocess
 from functools import reduce
@@ -31,25 +32,45 @@ class UploadBase:
             os.remove(r)
             logger.info('删除-' + r)
 
+
     def filter_file(self, index):
+        media_extensions = ['.mp4', '.flv', '.ts']
         file_list = UploadBase.file_list(index)
         if len(file_list) == 0:
             return False
+        for f in file_list:
+            if f.endswith('.part'):
+                new_name = os.path.splitext(f)[0]
+                shutil.move(f, new_name)
+                logger.info(f'{f}存在已更名为{new_name}')
         for r in file_list:
-            file_size = os.path.getsize(r) / 1024 / 1024
-            threshold = self.data.get('threshold') if self.data.get('threshold') else 2
-            if file_size <= threshold:
-                os.remove(r)
-                logger.info('过滤删除-' + r)
+            name, ext = os.path.splitext(r)
+            if ext in ('.mp4', '.flv', '.ts'):
+                file_size = os.path.getsize(r) / 1024 / 1024
+                threshold = self.data.get('threshold',2)
+                if file_size <= threshold:
+                    self.remove_file(r)
+                    logger.info(f'过滤删除-{r}')
+            if ext == '.xml': #过滤不存在对应视频的xml弹幕文件
+                xml_file_name = name
+                media_regex = re.compile(r'^{}(\.(mp4|flv|ts))?$'.format(
+                    re.escape(xml_file_name)
+                ))
+                if not any(media_regex.match(f'{xml_file_name}{ext2}') for ext2 in media_extensions for x in file_list):
+                    self.remove_file(r)
+                    logger.info(f'无视频，已过滤删除-{r}')
         file_list = UploadBase.file_list(index)
         if len(file_list) == 0:
             logger.info('视频过滤后无文件可传')
             return False
-        for f in file_list:
-            if f.endswith('.part'):
-                shutil.move(f, os.path.splitext(f)[0])
-                logger.info('%s存在已更名' % f)
+
+
+
         return True
+
+    def remove_file(self, file_path):
+        with open(file_path, 'r', encoding='utf-8'):
+            os.remove(file_path)
 
     def upload(self, file_list):
         raise NotImplementedError()
@@ -75,14 +96,19 @@ class UploadBase:
                     dest = Path(post_processor['mv'])
                     if not dest.is_dir():
                         dest.mkdir(parents=True, exist_ok=True)
-                    #path.rename(dest / path.name)
-                    shutil.move(path, dest / path.name)
+                    try:
+                        shutil.move(path, dest / path.name)
+                    except Exception as e:
+                        logger.exception(e)
+                        continue
                     logger.info(f"move to {(dest / path.name).absolute()}")
             if post_processor.get('run'):
-                process = subprocess.run(
-                    post_processor['run'], shell=True, input=reduce(lambda x, y: x + str(Path(y).absolute()) + '\n', data, ''),
-                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-                if process.returncode != 0:
-                    logger.error(process.stdout)
-                    raise Exception("PostProcessorRunTimeError")
-                logger.info(process.stdout.rstrip())
+                try:
+                    process_output = subprocess.check_output(
+                        post_processor['run'], shell=True, 
+                        input=reduce(lambda x, y: x + str(Path(y).absolute()) + '\n', data, ''),
+                        stderr=subprocess.STDOUT, text=True)
+                    logger.info(process_output.rstrip())
+                except subprocess.CalledProcessError as e:
+                    logger.exception(e.output)
+                    continue

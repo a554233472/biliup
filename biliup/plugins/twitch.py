@@ -9,6 +9,7 @@ from . import logger
 from ..engine.decorators import Plugin
 from ..engine.download import DownloadBase
 from ..plugins import BatchCheckBase
+from biliup.config import config
 
 VALID_URL_BASE = r'(?:https?://)?(?:(?:www|go|m)\.)?twitch\.tv/(?P<id>[0-9_a-zA-Z]+)'
 _OPERATION_HASHES = {
@@ -23,7 +24,7 @@ _OPERATION_HASHES = {
 _CLIENT_ID = 'kimne78kx3ncx6brgo4mv6wki5h1ko'
 
 
-@Plugin.download(regexp=r'https?://(?:(?:www|go|m)\.)?twitch\.tv/(?P<id>[^/]+)/(?:videos|profile)')
+@Plugin.download(regexp=r'https?://(?:(?:www|go|m)\.)?twitch\.tv/(?P<id>[^/]+)/(?:videos|profile|clips)')
 class TwitchVideos(DownloadBase):
     def __init__(self, fname, url, suffix='mp4'):
         DownloadBase.__init__(self, fname, url, suffix=suffix)
@@ -95,11 +96,16 @@ class Twitch(DownloadBase):
             self.room_title = data.get('data').get('user').get('lastBroadcast').get('title')
         if self.downloader == 'ffmpeg':
             port = random.randint(1025, 65535)
-            self.proc = subprocess.Popen([
+            stream_shell = [
                 "streamlink", "--player-external-http", "--twitch-disable-ads",
                 "--twitch-disable-hosting", "--twitch-disable-reruns",
                 "--player-external-http-port", str(port), self.url, "best"
-            ])
+            ]
+            twitch_cookie = config.get('user', {}).get('twitch_cookie')
+            if twitch_cookie:
+                twitch_cookie = "--twitch-api-header=Authorization=OAuth " + twitch_cookie
+                stream_shell.insert(1, twitch_cookie)
+            self.proc = subprocess.Popen(stream_shell)
             self.raw_stream_url = f"http://localhost:{port}"
             i = 0
             while i < 5:

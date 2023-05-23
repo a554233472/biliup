@@ -83,7 +83,7 @@ class BiliBili:
             self.appsec = 'c75875c596a69eb55bd119e74b07cfe3'
         self.__session = requests.Session()
         self.video = video
-        self.__session.mount('https://', HTTPAdapter(max_retries=Retry(total=5, method_whitelist=False)))
+        self.__session.mount('https://', HTTPAdapter(max_retries=Retry(total=5)))
         self.__session.headers.update({
             "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/63.0.3239.108",
             "Referer": "https://www.bilibili.com/", 'Connection': 'keep-alive'
@@ -145,11 +145,11 @@ class BiliBili:
         if os.path.isfile(persistence_path):
             print('使用持久化内容上传')
             self.load()
-        if not self.cookies and user.get('cookies'):
+        if user.get('cookies'):
             self.cookies = user['cookies']
-        if not self.access_token and user.get('access_token'):
+        if user.get('access_token'):
             self.access_token = user['access_token']
-        if not self.account and user.get('account'):
+        if user.get('account'):
             self.account = user['account']
         if self.cookies:
             try:
@@ -293,24 +293,30 @@ class BiliBili:
     def upload_file(self, filepath: str, lines='AUTO', tasks=3):
         """上传本地视频文件,返回视频信息dict
         b站目前支持4种上传线路upos, kodo, gcs, bos
-        gcs: {"os":"gcs","query":"bucket=bvcupcdngcsus&probe_version=20200810",
+        gcs: {"os":"gcs","query":"bucket=bvcupcdngcsus&probe_version=20221109",
         "probe_url":"//storage.googleapis.com/bvcupcdngcsus/OK"},
-        bos: {"os":"bos","query":"bucket=bvcupcdnboshb&probe_version=20200810",
+        bos: {"os":"bos","query":"bucket=bvcupcdnboshb&probe_version=20221109",
         "probe_url":"??"}
         """
         if not self._auto_os:
             if lines == 'kodo':
-                self._auto_os = {"os": "kodo", "query": "bucket=bvcupcdnkodobm&probe_version=20200810",
+                self._auto_os = {"os": "kodo", "query": "bucket=bvcupcdnkodobm&probe_version=20221109",
                                  "probe_url": "//up-na0.qbox.me/crossdomain.xml"}
             elif lines == 'bda2':
-                self._auto_os = {"os": "upos", "query": "upcdn=bda2&probe_version=20200810",
+                self._auto_os = {"os": "upos", "query": "upcdn=bda2&probe_version=20221109",
                                  "probe_url": "//upos-sz-upcdnbda2.bilivideo.com/OK"}
+            elif lines == 'cs-bda2':
+                self._auto_os = {"os": "upos", "query": "upcdn=bda2&probe_version=20221109",
+                                 "probe_url": "//upos-cs-upcdnbda2.bilivideo.com/OK"}
             elif lines == 'ws':
-                self._auto_os = {"os": "upos", "query": "upcdn=ws&probe_version=20200810",
+                self._auto_os = {"os": "upos", "query": "upcdn=ws&probe_version=20221109",
                                  "probe_url": "//upos-sz-upcdnws.bilivideo.com/OK"}
             elif lines == 'qn':
-                self._auto_os = {"os": "upos", "query": "upcdn=qn&probe_version=20200810",
+                self._auto_os = {"os": "upos", "query": "upcdn=qn&probe_version=20221109",
                                  "probe_url": "//upos-sz-upcdnqn.bilivideo.com/OK"}
+            elif lines == 'cs-qn':
+                self._auto_os = {"os": "upos", "query": "upcdn=qn&probe_version=20221109",
+                                 "probe_url": "//upos-cs-upcdnqn.bilivideo.com/OK"}
             elif lines == 'cos':
                 self._auto_os = {"os": "cos", "query": "",
                                  "probe_url": ""}

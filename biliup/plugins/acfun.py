@@ -44,8 +44,8 @@ class Acfun(DownloadBase):
         }
         r2 = requests.post("https://api.kuaishouzt.com/rest/zt/live/web/startPlay",
                            headers=headers2, data=data2, params=params)
-        if r2.json()['result'] != 1:
-            logger.debug(r2.json()['error_msg'])
+        if r2.json().get('result') != 1:
+            logger.debug(r2.json())
             return False
         d = r2.json()['data']['videoPlayRes']
         self.raw_stream_url = json.loads(d)['liveAdaptiveManifest'][0]['adaptationSet']['representation'][-1]['url']
